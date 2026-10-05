@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ANSI Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+PINK='\033[1;35m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# ─────────────────────────────────────────────────────────────────
+# Welcome Banner with Full Cat ASCII Art
+# ─────────────────────────────────────────────────────────────────
+echo -ne "${PINK}"
+cat << 'EOF'
+        /\_____/\
+       /  o   o  \
+      ( ==  ^  == )
+       )         (
+      (           )
+     ( (  )   (  ) )
+    (__(__)___(__)__)
+EOF
+echo -ne "${NC}"
+echo -e "${CYAN}┌─────────────────────────────────────────┐${NC}"
+echo -e "${CYAN}│  🐾 Arch Linux Safe Update Assistant 🐾 │${NC}"
+echo -e "${CYAN}│   Guarding your rice, dots & packages!  │${NC}"
+echo -e "${CYAN}└─────────────────────────────────────────┘${NC}"
+echo ""
+
+# ─────────────────────────────────────────────────────────────────
+# 1. Back up active Rice & Dotfiles (hyprland, matugen, illogical, etc.)
+# ─────────────────────────────────────────────────────────────────
+echo -ne "${PINK}"
+cat << 'EOF'
+       /\_/\
+      ( o.o )
+      /|   |\
+     (_|   |_)
+EOF
+echo -e "${BLUE}📦 [Step 1/7]${NC} Packing up your rice, matugen & configs..."
+if [[ -x "${HOME}/.local/bin/rice-backup" ]]; then
+    "${HOME}/.local/bin/rice-backup"
+else
+    echo -e "  ${YELLOW}Notice: rice-backup script not found, proceeding...${NC}"
+fi
+echo ""
+
+# ─────────────────────────────────────────────────────────────────
+# 2. Check for Currently Broken AUR Packages (Pre-check)
+# ─────────────────────────────────────────────────────────────────
+echo -ne "${PINK}"
+cat << 'EOF'
+       /\_/\
+      ( •.• )
+      /|   |\
+     (_|   |_)
+EOF
+echo -e "${BLUE}🔍 [Step 2/7]${NC} Sniffing for broken AUR shared libraries..."
+BROKEN_BEFORE=$(checkrebuild 2>/dev/null || true)
+if [ -n "$BROKEN_BEFORE" ]; then
+    echo -e "${RED}⚠ Found existing broken packages before update:${NC}"
+    echo "$BROKEN_BEFORE" | sed 's/^/    /'
+    echo ""
+else
+    echo -e "  ${GREEN}✓ No existing broken AUR dependencies detected! Purr-fect.${NC}"
+fi
+echo ""
+
+# ─────────────────────────────────────────────────────────────────
+# 3. Preview Pending Updates
+# ─────────────────────────────────────────────────────────────────
+echo -ne "${PINK}"
+cat << 'EOF'
+       /\_/\
+      ( ◕.◕ )
+      /|   |\~
+     (_|   |_)
+EOF
+echo -e "${BLUE}📜 [Step 3/7]${NC} Reading the pending updates scroll..."
+PENDING_REPO=$(checkupdates 2>/dev/null || true)
+PENDING_AUR=$(yay -Qua 2>/dev/null || true)
+
+if [ -z "$PENDING_REPO" ] && [ -z "$PENDING_AUR" ]; then
+    echo -e "  ${GREEN}✓ Your system is completely up to date! (=^･ω･^=)${NC}"
+    echo ""
+    read -rp "Do you still want to take a manual snapshot? [y/N]: " force_snap
+    if [[ ! "$force_snap" =~ ^[Yy]$ ]]; then
+        echo -ne "${PINK}"
+        cat << 'EOF'
+       /\_/\
+      ( -.- ) Zzz... Taking a cat nap then... Exiting!
+     (__(__)_)
+EOF
+        echo -e "${NC}"
+        exit 0
+    fi
+else
+    if [ -n "$PENDING_REPO" ]; then
+        REPO_COUNT=$(echo "$PENDING_REPO" | wc -l)
+        echo -e "  ${BOLD}Official Repositories (${REPO_COUNT} packages):${NC}"
+        echo "$PENDING_REPO" | sed 's/^/    /'
+    fi
+    if [ -n "$PENDING_AUR" ]; then
+        AUR_COUNT=$(echo "$PENDING_AUR" | wc -l)
+        echo -e "  ${BOLD}AUR Packages (${AUR_COUNT} packages):${NC}"
+        echo "$PENDING_AUR" | sed 's/^/    /'
+    fi
+    echo ""
+    read -rp "Proceed with snapshot and full system update? [Y/n]: " confirm
+    if [[ "$confirm" =~ ^[Nn]$ ]]; then
+        echo -ne "${PINK}"
+        cat << 'EOF'
+       /\_/\
+      ( >_< )  *paws tucked away* Update canceled!
+     (__(__)_)
+EOF
+        echo -e "${NC}"
+        exit 0
+    fi
+fi
+echo ""
+
+# ─────────────────────────────────────────────────────────────────
+# 4. Take Timeshift Btrfs Snapshot (Root + Home included)
+# ─────────────────────────────────────────────────────────────────
+echo -ne "${PINK}"
+cat << 'EOF'
+       /\_/\
+      ( •̀.•́ )
+      /|   |\~
+     (_|   |_)
+EOF
+echo -e "${BLUE}🛡️ [Step 4/7]${NC} Casting Btrfs snapshot shield over root & @home..."
+SNAP_COMMENT="pre-update $(date '+%Y-%m-%d %H:%M')"
+sudo timeshift --create --comments "$SNAP_COMMENT" --tags O
+echo -e "${GREEN}✓ Snapshot created successfully!${NC}"
+echo -e "  ${CYAN}System files, @home, matugen themes & rice configs are safely shielded.${NC}"
+echo ""
+
+# ─────────────────────────────────────────────────────────────────
+# 5. Execute System & AUR Upgrade
+# ─────────────────────────────────────────────────────────────────
+echo -ne "${PINK}"
+cat << 'EOF'
+       /\_/\
+      ( ^.^ )
+      /|   |\💻
+     (_|   |_)
+EOF
+echo -e "${BLUE}💻 [Step 5/7]${NC} *tippity tappity* Upgrading packages with yay..."
+yay -Syu
+echo ""
+
+# ─────────────────────────────────────────────────────────────────
+# 6. Post-update: Rebuild Detector Check & Rice Health Check
+# ─────────────────────────────────────────────────────────────────
+echo -ne "${PINK}"
+cat << 'EOF'
+       /\_/\
+      ( ˘ω˘ )
+      /|   |\
+     (_|   |_)
+EOF
+echo -e "${BLUE}🩺 [Step 6/7]${NC} Checking post-update library health & rice vitals..."
+BROKEN_AFTER=$(checkrebuild 2>/dev/null || true)
+
+if [ -n "$BROKEN_AFTER" ]; then
+    echo -e "${RED}${BOLD}⚠ The following AUR packages were linked against libraries that were just updated:${NC}"
+    echo "$BROKEN_AFTER" | sed 's/^/    /'
+    echo ""
+    REBUILD_PKGS=$(echo "$BROKEN_AFTER" | awk '{print $2}' | sort -u | tr '\n' ' ')
+    echo -e "${CYAN}Run the following command to rebuild them:${NC}"
+    echo -e "  ${BOLD}yay -S --rebuild $REBUILD_PKGS${NC}"
+else
+    echo -e "  ${GREEN}✓ All AUR packages are fully compatible with updated libraries!${NC}"
+fi
+
+# Run rice health check if available
+if [[ -x "${HOME}/.local/bin/rice-healthcheck" ]]; then
+    echo ""
+    "${HOME}/.local/bin/rice-healthcheck"
+fi
+echo ""
+
+# ─────────────────────────────────────────────────────────────────
+# 7. Post-update: Restart fingerprint sensor
+# ─────────────────────────────────────────────────────────────────
+echo -ne "${PINK}"
+cat << 'EOF'
+       /\_/\
+      ( ˶ᵔ ᵕ ᵔ˶ )
+      /|   |\
+     (_|   |_)
+EOF
+echo -e "${BLUE}🔏 [Step 7/7]${NC} Refreshing fingerprint sensor..."
+if command -v fprintd-list &>/dev/null; then
+    sudo systemctl restart fprintd.service 2>/dev/null && \
+        echo -e "  ${GREEN}✓ Fingerprint service restarted!${NC}" || \
+        echo -e "  ${YELLOW}Notice: Could not restart fprintd${NC}"
+    FPRINT_STATUS=$(fprintd-list "$(whoami)" 2>/dev/null | grep "right-index-finger" || true)
+    if [ -n "$FPRINT_STATUS" ]; then
+        echo -e "  ${GREEN}✓ Fingerprint enrolled & sensor healthy 🐾${NC}"
+    else
+        echo -e "  ${YELLOW}⚠ No fingerprint enrolled. Run: fprintd-enroll${NC}"
+    fi
+else
+    echo -e "  ${YELLOW}Notice: fprintd not installed, skipping...${NC}"
+fi
+
+echo ""
+echo -e "${CYAN}${BOLD}════════════════════════════════════════════════════════════${NC}"
+echo -ne "${PINK}"
+cat << 'EOF'
+        /\_____/\
+       /  ^   ^  \
+      ( ==  w  == )
+       )         (
+      (           )
+     ( (  )   (  ) )
+    (__(__)___(__)__)
+EOF
+echo -e "${GREEN}${BOLD}✨ Purr-fect! Update completed safely! ✨${NC}"
+echo -e "${CYAN}Your system is fresh, rice is cozy, and snapshots are ready!${NC}"
+echo ""
+echo -e "${CYAN}Rollback instructions (if anything ever breaks):${NC}"
+echo -e "  - Full system rollback:    ${BOLD}sudo timeshift --restore${NC}"
+echo -e "  - Rice config rollback:    ${BOLD}~/.local/bin/rice-restore${NC}"
+echo -e "${CYAN}${BOLD}════════════════════════════════════════════════════════════${NC}"
