@@ -54,19 +54,41 @@ Optional:
 
 ## Install
 
+### From AUR (easiest)
+
+If you use `yay` or another AUR helper:
+
+```sh
+yay -S arch-safe-update
+```
+
+The package will be installed to `/usr/bin/safe-update`. Then just run:
+
+```sh
+safe-update
+```
+
+### From GitHub (with installer)
+
 ```sh
 git clone https://github.com/YajatGhule/arch-safe-update.git
 cd arch-safe-update
 ./install.sh            # installs to ~/.local/bin/safe-update
 ```
 
-Or by hand:
+Make sure `~/.local/bin` is on your `PATH`.
+
+### Manual install
 
 ```sh
 install -Dm755 safe-update ~/.local/bin/safe-update
 ```
 
-Make sure `~/.local/bin` is on your `PATH`.
+Or system-wide:
+
+```sh
+sudo install -Dm755 safe-update /usr/local/bin/safe-update
+```
 
 ## Usage
 
