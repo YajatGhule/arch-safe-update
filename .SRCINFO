@@ -1,0 +1,18 @@
+pkgbase = arch-safe-update
+	pkgdesc = Cat-themed safe system updater: Timeshift snapshot, update preview, yay -Syu, AUR rebuild check
+	pkgver = 1.0.0
+	pkgrel = 1
+	url = https://github.com/YajatGhule/arch-safe-update
+	arch = any
+	license = MIT
+	depends = bash
+	depends = yay
+	depends = pacman-contrib
+	depends = rebuild-detector
+	depends = timeshift
+	depends = sudo
+	optdepends = fprintd: restart and check the fingerprint sensor after updating
+	source = arch-safe-update-1.0.0.tar.gz::https://github.com/YajatGhule/arch-safe-update/archive/refs/tags/v1.0.0.tar.gz
+	sha256sums = c910e50275d2349da1fbfb8dd35ac0a00e080573163611837465f39c1aadca06
+
+pkgname = arch-safe-update
