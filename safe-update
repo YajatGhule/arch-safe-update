@@ -11,6 +11,18 @@ PINK='\033[1;35m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Prints "<binary> <built-against Qt> <installed Qt>" and succeeds if Quickshell
+# was built against a different Qt than the one installed now.
+quickshell_qt_mismatch() {
+    local bin built installed
+    bin=$(command -v quickshell || command -v qs || true)
+    [[ -n "$bin" ]] && command -v strings &>/dev/null || return 1
+    built=$(strings -n 5 "$bin" | grep -m1 -xE '6\.[0-9]+\.[0-9]+' || true)
+    installed=$(pacman -Q qt6-base 2>/dev/null | awk '{print $2}' | cut -d- -f1)
+    [[ -n "$built" && -n "$installed" && "$built" != "$installed" ]] || return 1
+    echo "$bin $built $installed"
+}
+
 # ─────────────────────────────────────────────────────────────────
 # Welcome Banner with Full Cat ASCII Art
 # ─────────────────────────────────────────────────────────────────
@@ -41,7 +53,7 @@ cat << 'EOF'
       /|   |\
      (_|   |_)
 EOF
-echo -e "${BLUE}📦 [Step 1/7]${NC} Packing up your rice, matugen & configs..."
+echo -e "${BLUE}📦 [Step 1/8]${NC} Packing up your rice, matugen & configs..."
 if [[ -x "${HOME}/.local/bin/rice-backup" ]]; then
     "${HOME}/.local/bin/rice-backup"
 else
@@ -59,7 +71,7 @@ cat << 'EOF'
       /|   |\
      (_|   |_)
 EOF
-echo -e "${BLUE}🔍 [Step 2/7]${NC} Sniffing for broken AUR shared libraries..."
+echo -e "${BLUE}🔍 [Step 2/8]${NC} Sniffing for broken AUR shared libraries..."
 BROKEN_BEFORE=$(checkrebuild 2>/dev/null || true)
 if [ -n "$BROKEN_BEFORE" ]; then
     echo -e "${RED}⚠ Found existing broken packages before update:${NC}"
@@ -80,20 +92,24 @@ cat << 'EOF'
       /|   |\~
      (_|   |_)
 EOF
-echo -e "${BLUE}📜 [Step 3/7]${NC} Reading the pending updates scroll..."
+echo -e "${BLUE}📜 [Step 3/8]${NC} Reading the pending updates scroll..."
 PENDING_REPO=$(checkupdates 2>/dev/null || true)
 PENDING_AUR=$(yay -Qua 2>/dev/null || true)
 
 if [ -z "$PENDING_REPO" ] && [ -z "$PENDING_AUR" ]; then
     echo -e "  ${GREEN}✓ Your system is completely up to date! (=^･ω･^=)${NC}"
-    echo -ne "${PINK}"
-    cat << 'EOF'
+    if quickshell_qt_mismatch >/dev/null; then
+        echo -e "  ${YELLOW}...but Quickshell still needs rebuilding for the new Qt. Continuing!${NC}"
+    else
+        echo -ne "${PINK}"
+        cat << 'EOF'
        /\_/\
       ( -.- ) Zzz... Taking a cat nap then... Exiting!
      (__(__)_)
 EOF
-    echo -e "${NC}"
-    exit 0
+        echo -e "${NC}"
+        exit 0
+    fi
 else
     if [ -n "$PENDING_REPO" ]; then
         REPO_COUNT=$(echo "$PENDING_REPO" | wc -l)
@@ -118,7 +134,7 @@ cat << 'EOF'
       /|   |\~
      (_|   |_)
 EOF
-echo -e "${BLUE}🛡️ [Step 4/7]${NC} Casting Btrfs snapshot shield over root & @home..."
+echo -e "${BLUE}🛡️ [Step 4/8]${NC} Casting Btrfs snapshot shield over root & @home..."
 
 # Ask for the sudo password once, then keep the credential cache warm in the
 # background so timeshift, yay/pacman and the fprintd restart never re-prompt.
@@ -143,7 +159,7 @@ cat << 'EOF'
       /|   |\💻
      (_|   |_)
 EOF
-echo -e "${BLUE}💻 [Step 5/7]${NC} *tippity tappity* Upgrading packages with yay..."
+echo -e "${BLUE}💻 [Step 5/8]${NC} *tippity tappity* Upgrading packages with yay..."
 yay -Syu --sudoloop --noconfirm --answerclean None --answerdiff None --answeredit None
 echo ""
 
@@ -157,7 +173,7 @@ cat << 'EOF'
       /|   |\
      (_|   |_)
 EOF
-echo -e "${BLUE}🩺 [Step 6/7]${NC} Checking post-update library health & rice vitals..."
+echo -e "${BLUE}🩺 [Step 6/8]${NC} Checking post-update library health & rice vitals..."
 BROKEN_AFTER=$(checkrebuild 2>/dev/null || true)
 
 if [ -n "$BROKEN_AFTER" ]; then
@@ -179,7 +195,50 @@ fi
 echo ""
 
 # ─────────────────────────────────────────────────────────────────
-# 7. Post-update: Restart fingerprint sensor
+# 7. Post-update: Rebuild Quickshell if Qt moved under it
+# ─────────────────────────────────────────────────────────────────
+# Quickshell uses Qt private APIs, so it must be rebuilt after every Qt
+# version bump. Packages from illogical-impulse's local PKGBUILDs aren't in
+# the AUR, so yay and checkrebuild never catch them.
+echo -ne "${PINK}"
+cat << 'EOF'
+       /\_/\
+      ( o.O )
+      /|   |\🔧
+     (_|   |_)
+EOF
+echo -e "${BLUE}🔧 [Step 7/8]${NC} Checking Quickshell against the installed Qt..."
+if ! QS_MISMATCH=$(quickshell_qt_mismatch); then
+    echo -e "  ${GREEN}✓ Quickshell is not installed or already matches the installed Qt!${NC}"
+else
+    read -r QS_BIN QS_QT SYS_QT <<< "$QS_MISMATCH"
+    QS_PKG=$(pacman -Qqo "$QS_BIN" 2>/dev/null || true)
+    if [[ -z "$QS_PKG" ]] || ! pacman -Qqm "$QS_PKG" &>/dev/null; then
+        echo -e "  ${YELLOW}⚠ Quickshell was built against Qt ${QS_QT} but Qt ${SYS_QT} is installed.${NC}"
+        echo -e "  ${YELLOW}  It comes from the official repos or no package; wait for a repo rebuild.${NC}"
+    else
+        echo -e "  ${YELLOW}Quickshell was built against Qt ${QS_QT}, system has Qt ${SYS_QT}. Rebuilding ${QS_PKG}...${NC}"
+        II_PKGBUILD_DIR="${HOME}/.cache/dots-hyprland/sdata/dist-arch/${QS_PKG}"
+        if [[ -f "${II_PKGBUILD_DIR}/PKGBUILD" ]]; then
+            REBUILD_CMD=(bash -c 'cd "$1" && makepkg -si --noconfirm --force --cleanbuild --clean' _ "$II_PKGBUILD_DIR")
+            MANUAL_CMD="cd ${II_PKGBUILD_DIR} && makepkg -si --force --cleanbuild"
+        else
+            REBUILD_CMD=(yay -S --rebuild --noconfirm --answerclean None --answerdiff None --answeredit None "$QS_PKG")
+            MANUAL_CMD="yay -S --rebuild ${QS_PKG}"
+        fi
+        if "${REBUILD_CMD[@]}"; then
+            echo -e "  ${GREEN}✓ ${QS_PKG} rebuilt against Qt ${SYS_QT}!${NC}"
+            echo -e "  ${CYAN}Restart your shell to load it (e.g. log out and back in).${NC}"
+        else
+            echo -e "  ${RED}⚠ Rebuilding ${QS_PKG} failed. Run manually:${NC}"
+            echo -e "    ${BOLD}${MANUAL_CMD}${NC}"
+        fi
+    fi
+fi
+echo ""
+
+# ─────────────────────────────────────────────────────────────────
+# 8. Post-update: Restart fingerprint sensor
 # ─────────────────────────────────────────────────────────────────
 echo -ne "${PINK}"
 cat << 'EOF'
@@ -188,7 +247,7 @@ cat << 'EOF'
       /|   |\
      (_|   |_)
 EOF
-echo -e "${BLUE}🔏 [Step 7/7]${NC} Refreshing fingerprint sensor..."
+echo -e "${BLUE}🔏 [Step 8/8]${NC} Refreshing fingerprint sensor..."
 if command -v fprintd-list &>/dev/null; then
     sudo systemctl restart fprintd.service 2>/dev/null && \
         echo -e "  ${GREEN}✓ Fingerprint service restarted!${NC}" || \
