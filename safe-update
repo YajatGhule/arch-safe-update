@@ -135,6 +135,14 @@ cat << 'EOF'
      (_|   |_)
 EOF
 echo -e "${BLUE}🛡️ [Step 4/7]${NC} Casting Btrfs snapshot shield over root & @home..."
+
+# Ask for the sudo password once, then keep the credential cache warm in the
+# background so timeshift, yay/pacman and the fprintd restart never re-prompt.
+sudo -v
+while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done 2>/dev/null &
+SUDO_KEEPALIVE_PID=$!
+trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT
+
 SNAP_COMMENT="pre-update $(date '+%Y-%m-%d %H:%M')"
 sudo timeshift --create --comments "$SNAP_COMMENT" --tags O
 echo -e "${GREEN}✓ Snapshot created successfully!${NC}"
@@ -152,7 +160,7 @@ cat << 'EOF'
      (_|   |_)
 EOF
 echo -e "${BLUE}💻 [Step 5/7]${NC} *tippity tappity* Upgrading packages with yay..."
-yay -Syu
+yay -Syu --sudoloop
 echo ""
 
 # ─────────────────────────────────────────────────────────────────

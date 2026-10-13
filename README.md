@@ -96,8 +96,10 @@ sudo install -Dm755 safe-update /usr/local/bin/safe-update
 safe-update
 ```
 
-You'll be prompted for confirmation before anything changes, and `sudo` is used
-for the Timeshift snapshot and the fprintd restart.
+You'll be prompted for confirmation before anything changes. Your `sudo`
+password is asked for only once, right after you confirm; the credential is kept
+alive in the background for the Timeshift snapshot, `yay -Syu` and the fprintd
+restart, and the keepalive stops when the script exits.
 
 ## Rolling back
 
