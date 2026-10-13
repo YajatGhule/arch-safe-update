@@ -11,6 +11,46 @@ PINK='\033[1;35m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Reads one field (e.g. "Version", "Make Deps") from `yay -Si --aur <pkg>`.
+aur_field() {
+    yay -Si --aur "$1" 2>/dev/null | awk -F' : ' -v f="$2" '$1 ~ "^"f" *$" {print $2; exit}' | xargs
+}
+
+# Replaces source-built AUR package $1 with its prebuilt "$1-bin" variant when
+# that variant exists, provides $1, isn't flagged out of date and isn't older.
+# The -bin package is fully built before the old one is removed.
+swap_to_bin() {
+    local pkg="$1" bin="$1-bin" make provides flagged bin_ver src_ver
+    make=$(aur_field "$pkg" "Make Deps")
+    [[ -n "$make" && "$make" != "None" ]] || return 1   # already a prebuilt repackage
+    bin_ver=$(aur_field "$bin" "Version")
+    [[ -n "$bin_ver" ]] || return 1
+    provides=$(aur_field "$bin" "Provides")
+    flagged=$(aur_field "$bin" "Out-of-date")
+    src_ver=$(aur_field "$pkg" "Version")
+    [[ " $provides " == *" $pkg "* || " $provides " == *" $pkg="* ]] || return 1
+    [[ "$flagged" == "No" ]] || return 1
+    (( $(vercmp "${bin_ver%-*}" "${src_ver%-*}") >= 0 )) || return 1
+
+    echo -e "  ${CYAN}↻ ${pkg} compiles from source; switching to prebuilt ${bin} ${bin_ver}...${NC}"
+    local workdir reason pkgfile
+    workdir=$(mktemp -d)
+    if ! (cd "$workdir" && yay -G "$bin" >/dev/null 2>&1 && cd "$bin" && makepkg -s --noconfirm >/dev/null); then
+        echo -e "  ${YELLOW}Notice: building ${bin} failed, keeping ${pkg}${NC}"
+        rm -rf "$workdir"; return 1
+    fi
+    pkgfile=$(cd "$workdir/$bin" && makepkg --packagelist | grep -v -- "/${bin}-debug-" | grep -- "/${bin}-[0-9]" | head -1)
+    pacman -Qqe "$pkg" &>/dev/null && reason=--asexplicit || reason=--asdeps
+    if [[ -f "$pkgfile" ]] && sudo pacman -Rdd --noconfirm "$pkg" >/dev/null \
+        && sudo pacman -U --noconfirm "$reason" "$pkgfile" >/dev/null; then
+        echo -e "  ${GREEN}✓ Now using ${bin}${NC}"
+    else
+        echo -e "  ${RED}⚠ Switching to ${bin} failed; reinstalling ${pkg}${NC}"
+        pacman -Q "$pkg" &>/dev/null || yay -S --noconfirm --answerclean None --answerdiff None --answeredit None "$pkg"
+    fi
+    rm -rf "$workdir"
+}
+
 # Prints "<binary> <built-against Qt> <installed Qt>" and succeeds if Quickshell
 # was built against a different Qt than the one installed now.
 quickshell_qt_mismatch() {
@@ -160,6 +200,13 @@ cat << 'EOF'
      (_|   |_)
 EOF
 echo -e "${BLUE}💻 [Step 5/8]${NC} *tippity tappity* Upgrading packages with yay..."
+# Prefer prebuilt -bin packages over slow source builds (skip -git/-bin and
+# anything listed in SAFE_UPDATE_KEEP_SOURCE, e.g. "localsend foo").
+for pkg in $(echo "$PENDING_AUR" | awk '{print $1}'); do
+    case "$pkg" in *-bin|*-git|*-debug) continue ;; esac
+    [[ " ${SAFE_UPDATE_KEEP_SOURCE:-} " == *" $pkg "* ]] && continue
+    swap_to_bin "$pkg" || true
+done
 yay -Syu --sudoloop --noconfirm --answerclean None --answerdiff None --answeredit None
 echo ""
 

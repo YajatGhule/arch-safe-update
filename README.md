@@ -27,7 +27,7 @@ that need rebuilding.
 | 2/8 | Runs `checkrebuild` to list AUR packages that are *already* broken |
 | 3/8 | Previews pending repo (`checkupdates`) and AUR (`yay -Qua`) updates |
 | 4/8 | Creates an on-demand Timeshift snapshot tagged `pre-update YYYY-MM-DD HH:MM` |
-| 5/8 | Runs `yay -Syu` non-interactively |
+| 5/8 | Swaps pending AUR packages that compile from source for their prebuilt `-bin` variant when one exists (provides the same package, not flagged out of date, not older), then runs `yay -Syu` non-interactively. Set `SAFE_UPDATE_KEEP_SOURCE="pkg1 pkg2"` to keep specific packages on source builds |
 | 6/8 | Runs `checkrebuild` again and prints a ready-to-paste `yay -S --rebuild …` command; runs `~/.local/bin/rice-healthcheck` (if present) |
 | 7/8 | If Quickshell was built against an older Qt than the one now installed, rebuilds its package (illogical-impulse's local PKGBUILD in `~/.cache/dots-hyprland`, or via `yay` for AUR builds) |
 | 8/8 | Restarts `fprintd` and checks that a fingerprint is still enrolled (skipped if fprintd isn't installed) |
