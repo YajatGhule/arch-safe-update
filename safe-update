@@ -86,18 +86,14 @@ PENDING_AUR=$(yay -Qua 2>/dev/null || true)
 
 if [ -z "$PENDING_REPO" ] && [ -z "$PENDING_AUR" ]; then
     echo -e "  ${GREEN}✓ Your system is completely up to date! (=^･ω･^=)${NC}"
-    echo ""
-    read -rp "Do you still want to take a manual snapshot? [y/N]: " force_snap
-    if [[ ! "$force_snap" =~ ^[Yy]$ ]]; then
-        echo -ne "${PINK}"
-        cat << 'EOF'
+    echo -ne "${PINK}"
+    cat << 'EOF'
        /\_/\
       ( -.- ) Zzz... Taking a cat nap then... Exiting!
      (__(__)_)
 EOF
-        echo -e "${NC}"
-        exit 0
-    fi
+    echo -e "${NC}"
+    exit 0
 else
     if [ -n "$PENDING_REPO" ]; then
         REPO_COUNT=$(echo "$PENDING_REPO" | wc -l)
@@ -108,18 +104,6 @@ else
         AUR_COUNT=$(echo "$PENDING_AUR" | wc -l)
         echo -e "  ${BOLD}AUR Packages (${AUR_COUNT} packages):${NC}"
         echo "$PENDING_AUR" | sed 's/^/    /'
-    fi
-    echo ""
-    read -rp "Proceed with snapshot and full system update? [Y/n]: " confirm
-    if [[ "$confirm" =~ ^[Nn]$ ]]; then
-        echo -ne "${PINK}"
-        cat << 'EOF'
-       /\_/\
-      ( >_< )  *paws tucked away* Update canceled!
-     (__(__)_)
-EOF
-        echo -e "${NC}"
-        exit 0
     fi
 fi
 echo ""
@@ -160,7 +144,7 @@ cat << 'EOF'
      (_|   |_)
 EOF
 echo -e "${BLUE}💻 [Step 5/7]${NC} *tippity tappity* Upgrading packages with yay..."
-yay -Syu --sudoloop
+yay -Syu --sudoloop --noconfirm --answerclean None --answerdiff None --answeredit None
 echo ""
 
 # ─────────────────────────────────────────────────────────────────

@@ -96,10 +96,11 @@ sudo install -Dm755 safe-update /usr/local/bin/safe-update
 safe-update
 ```
 
-You'll be prompted for confirmation before anything changes. Your `sudo`
-password is asked for only once, right after you confirm; the credential is kept
-alive in the background for the Timeshift snapshot, `yay -Syu` and the fprintd
-restart, and the keepalive stops when the script exits.
+The run is fully unattended: the only input is your `sudo` password, asked for
+once after the pending updates are listed (nothing is asked if you're already up
+to date). The credential is kept alive in the background for the Timeshift
+snapshot, `yay -Syu` and the fprintd restart, and the keepalive stops when the
+script exits. `yay` runs with `--noconfirm` and skips the clean/diff/edit menus.
 
 ## Rolling back
 
